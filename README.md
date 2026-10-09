@@ -1,6 +1,6 @@
 # World Disaster Watch
 
-A live map of active disasters worldwide (tropical cyclones, earthquakes, floods, wildfires,
+A live 3D globe of active disasters worldwide (tropical cyclones, earthquakes, floods, wildfires,
 volcanoes and droughts) with each event explained in plain language and a 7-day weather
 forecast for the affected spot.
 
@@ -16,7 +16,7 @@ GDACS (UN / European Commission) ─┐                        ┌─ docs/data/
 USGS earthquakes (M4.5+, 7 days) ──┘   + explain.py        ├─ docs/data/cyclones.geojson
                                                            └─ data/history.csv (one row per day)
                                                                      │
-                       docs/index.html (Leaflet map) ◄───────────────┘
+                       docs/index.html (globe.gl 3D globe) ◄───────────────┘
                                  ▲
                                  └── Open-Meteo forecast, fetched in the browser on click
 ```
@@ -32,6 +32,7 @@ USGS earthquakes (M4.5+, 7 days) ──┘   + explain.py        ├─ docs/dat
   they mean.
 - **Daily history.** The first run each day appends counts by alert level and hazard type to
   `data/history.csv`, building a running record of world disaster activity.
+- **Click anywhere.** Any point on the globe (or a searched place) opens an inspector with the place name (OpenStreetMap Nominatim), current weather in plain words, a 24-hour temperature line, a 7-day forecast, air quality (US AQI, PM2.5, UV) and every active disaster within 1,000 km.
 - **Forecasts come from official sources:** GDACS/NOAA cyclone wind zones (60/90/120 km/h)
   and tracks, and the Open-Meteo weather forecast at the event location, with plain notes for
   heavy rain, gale-force wind and dangerous heat. The app does not make its own disaster
@@ -48,4 +49,4 @@ python -m http.server -d docs               # http://localhost:8000
 ```
 
 Not an official warning service. Always follow local authorities.
-Data: GDACS, USGS, Open-Meteo; map © OpenStreetMap contributors.
+Data: GDACS, USGS, Open-Meteo; place names © OpenStreetMap contributors; globe imagery NASA.

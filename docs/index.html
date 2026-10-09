@@ -4,309 +4,445 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>World Disaster Watch</title>
-<meta name="description" content="Live map of active disasters worldwide (cyclones, earthquakes, floods, wildfires, volcanoes, droughts) explained in plain language, with local weather forecasts.">
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<meta name="description" content="A live 3D globe of active disasters worldwide (cyclones, earthquakes, floods, wildfires, volcanoes, droughts) explained in plain language. Click anywhere for local weather, forecast and air quality.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
 <style>
+/* tokens copied from the portfolio (Portfoli0/src/index.css) so the two read as one brand */
 :root {
-  color-scheme: light;
-  --surface: #fcfcfb; --card: #ffffff; --border: #e6e5e1; --hover: #f3f2ee;
-  --text-primary: #0b0b0b; --text-secondary: #52514e; --text-muted: #77766f;
-  --accent: #2a78d6;
-  --red: #d62f2f; --orange: #e07000; --green: #2f8a3a;
-  --red-bg: #fde8e8; --orange-bg: #fdefdc; --green-bg: #e3f3e5;
-}
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    color-scheme: dark;
-    --surface: #1a1a19; --card: #222221; --border: #34342f; --hover: #2c2c2a;
-    --text-primary: #ffffff; --text-secondary: #c3c2b7; --text-muted: #94938a;
-    --accent: #3987e5;
-    --red: #f06262; --orange: #f59a3c; --green: #5cba68;
-    --red-bg: #4a2222; --orange-bg: #4a3216; --green-bg: #1f3a23;
-  }
-}
-:root[data-theme="dark"] {
   color-scheme: dark;
-  --surface: #1a1a19; --card: #222221; --border: #34342f; --hover: #2c2c2a;
-  --text-primary: #ffffff; --text-secondary: #c3c2b7; --text-muted: #94938a;
-  --accent: #3987e5;
-  --red: #f06262; --orange: #f59a3c; --green: #5cba68;
-  --red-bg: #4a2222; --orange-bg: #4a3216; --green-bg: #1f3a23;
+  --bg: #070606; --ink: #efe9dd; --soft: #cfc8ba; --muted: #9a9284; --faint: #6a6358;
+  --line: rgba(239, 233, 221, 0.1); --panel: rgba(16, 14, 13, 0.88); --neon: #39ff88;
+  --red: #ff5a52; --orange: #ffa53a; --green: #6fd38a;
+  --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
 }
 * { box-sizing: border-box; }
-html, body { height: 100%; }
-body { margin: 0; background: var(--surface); color: var(--text-primary);
-  font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; display: flex; flex-direction: column; }
-header { padding: 12px 16px; border-bottom: 1px solid var(--border); display: flex; flex-wrap: wrap; gap: 6px 16px; align-items: baseline; }
-header h1 { font-size: 20px; margin: 0; letter-spacing: -0.01em; }
-header .meta { color: var(--text-muted); font-size: 13px; }
-.layout { flex: 1; display: grid; grid-template-columns: minmax(0, 1fr) 400px; min-height: 0; }
-#map { min-height: 300px; background: var(--hover); }
-aside { border-left: 1px solid var(--border); overflow-y: auto; display: flex; flex-direction: column; min-width: 0; }
-.filters { padding: 12px 16px; border-bottom: 1px solid var(--border); display: flex; flex-wrap: wrap; gap: 6px; }
-.chip { display: inline-flex; align-items: center; gap: 4px; border: 1px solid var(--border); border-radius: 999px;
-  padding: 3px 10px; font-size: 13px; cursor: pointer; user-select: none; background: var(--card); }
-.chip input { margin: 0; accent-color: var(--accent); }
-.chip .n { color: var(--text-muted); }
+html, body { height: 100%; margin: 0; }
+body { background: var(--bg); color: var(--ink); font: 14px/1.55 var(--sans); overflow: hidden; }
+a { color: var(--neon); }
+:focus-visible { outline: 2px solid var(--neon); outline-offset: 2px; }
+
+.stage { position: fixed; inset: 0 440px 0 0; }
+#globe { position: absolute; inset: 0; cursor: crosshair; }
+.hud { position: absolute; z-index: 2; font: 500 11px/1.4 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); pointer-events: none; }
+.hud.tl { top: 18px; left: 20px; } .hud.tr { top: 18px; right: 20px; text-align: right; }
+.hud.bl { bottom: 18px; left: 20px; } .hud.br { bottom: 18px; right: 20px; text-align: right; }
+.hud b { color: var(--ink); font-weight: 500; }
+.live { color: var(--ink); } .live::before { content: ""; display: inline-block; width: 7px; height: 7px; border-radius: 50%;
+  background: var(--red); margin-right: 8px; vertical-align: 1px; animation: blink 1.6s infinite; }
+@keyframes blink { 50% { opacity: .25; } }
+.corner { position: absolute; width: 18px; height: 18px; border: 1px solid var(--faint); z-index: 2; pointer-events: none; }
+.corner.tl { top: 10px; left: 10px; border-right: 0; border-bottom: 0; } .corner.tr { top: 10px; right: 10px; border-left: 0; border-bottom: 0; }
+.corner.bl { bottom: 10px; left: 10px; border-right: 0; border-top: 0; } .corner.br { bottom: 10px; right: 10px; border-left: 0; border-top: 0; }
+.legend span { margin-left: 14px; } .legend i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; border: 2px solid; margin-right: 6px; vertical-align: -1px; }
+
+aside { position: fixed; top: 0; right: 0; bottom: 0; width: 440px; background: var(--panel); border-left: 1px solid var(--line);
+  overflow-y: auto; backdrop-filter: blur(6px); }
+.brand { padding: 18px 20px 14px; border-bottom: 1px solid var(--line); }
+.brand .path { font: 700 15px var(--mono); color: var(--ink); }
+.brand .path em { color: var(--neon); font-style: normal; }
+.brand p { margin: 6px 0 0; color: var(--muted); font-size: 13px; }
+.block { padding: 16px 20px; border-bottom: 1px solid var(--line); }
+.cmd { font: 500 12px var(--mono); color: var(--muted); margin: 0 0 10px; }
+.cmd::before { content: "$ "; color: var(--neon); }
+.search { display: flex; gap: 8px; }
+.search input { flex: 1; min-width: 0; font: 13px var(--mono); color: var(--ink); background: rgba(239,233,221,.04); border: 1px solid var(--line);
+  border-radius: 6px; padding: 8px 10px; }
+.search input::placeholder { color: var(--faint); }
+.btn { font: 500 12px var(--mono); color: var(--ink); background: transparent; border: 1px solid var(--line); border-radius: 6px; padding: 7px 10px; cursor: pointer; }
+.btn:hover { border-color: var(--neon); color: var(--neon); }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { display: inline-flex; align-items: center; gap: 6px; font: 500 12px var(--mono); color: var(--soft); border: 1px solid var(--line);
+  border-radius: 6px; padding: 4px 8px; cursor: pointer; user-select: none; position: relative; }
+.chip input { position: absolute; opacity: 0; pointer-events: none; }
+.chip:has(input:checked) { color: var(--ink); border-color: rgba(57,255,136,.45); }
+.chip:has(input:not(:checked)) { opacity: .45; }
+.chip:has(input:focus-visible) { outline: 2px solid var(--neon); }
+.chip .n { color: var(--faint); }
+.chip svg, .row svg, h2 svg { width: 16px; height: 16px; flex: none; }
 .list { list-style: none; margin: 0; padding: 0; }
-.list button { all: unset; box-sizing: border-box; width: 100%; padding: 10px 16px; display: grid;
-  grid-template-columns: 28px minmax(0, 1fr) auto; gap: 2px 10px; cursor: pointer; border-bottom: 1px solid var(--border); }
-.list button:hover, .list button:focus-visible { background: var(--hover); }
-.list button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
-.list .glyph { font-size: 20px; line-height: 1.3; grid-row: span 2; }
-.list .title { font-weight: 600; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.list .sub { color: var(--text-muted); font-size: 12.5px; grid-column: 2 / 4; }
-.pill { font-size: 11.5px; font-weight: 650; padding: 1px 8px; border-radius: 999px; white-space: nowrap; align-self: start; }
-.pill.Red { color: var(--red); background: var(--red-bg); }
-.pill.Orange { color: var(--orange); background: var(--orange-bg); }
-.pill.Green { color: var(--green); background: var(--green-bg); }
-.detail { padding: 16px; border-bottom: 1px solid var(--border); }
-.detail[hidden] { display: none; }
-.detail h2 { font-size: 18px; margin: 6px 0 2px; line-height: 1.3; }
-.detail h3 { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--text-muted); margin: 14px 0 4px; }
-.detail p { margin: 0 0 6px; }
-.detail .when { color: var(--text-muted); font-size: 13px; }
-.close { float: right; all: unset; cursor: pointer; color: var(--text-muted); font-size: 13px; padding: 2px 6px; border-radius: 6px; }
-.close:hover, .close:focus-visible { background: var(--hover); color: var(--text-primary); }
-.close:focus-visible { outline: 2px solid var(--accent); }
-table.wx { width: 100%; border-collapse: collapse; font-size: 13px; }
-table.wx th, table.wx td { padding: 4px 4px; border-bottom: 1px solid var(--border); text-align: right; font-variant-numeric: tabular-nums; }
-table.wx th:first-child, table.wx td:first-child { text-align: left; }
-table.wx th { color: var(--text-secondary); font-weight: 600; }
-.wxnote { font-size: 13px; margin-top: 6px; }
-.wxnote li { margin-bottom: 2px; }
-.empty { padding: 16px; color: var(--text-muted); }
-details.help { padding: 12px 16px; border-bottom: 1px solid var(--border); font-size: 14px; }
-details.help summary { cursor: pointer; font-weight: 600; }
-details.help dt { font-weight: 600; margin-top: 8px; }
-details.help dd { margin: 0; color: var(--text-secondary); }
-.disclaimer { padding: 12px 16px; font-size: 12.5px; color: var(--text-muted); }
-.disclaimer a, .detail a { color: var(--accent); }
-/* map markers */
-.dw-marker { display: grid; place-items: center; border-radius: 50%; border: 3px solid; background: var(--card);
-  font-size: 15px; box-shadow: 0 1px 4px rgb(0 0 0 / .35); }
-.dw-marker.Red { border-color: var(--red); }
-.dw-marker.Orange { border-color: var(--orange); }
-.dw-marker.Green { border-color: var(--green); }
-.dw-marker.selected { outline: 3px solid var(--accent); outline-offset: 2px; }
-.leaflet-container { font: inherit; }
-/* OSM has no dark tiles: invert + rotate hue so water stays blue-ish */
-@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .leaflet-tile-pane { filter: invert(1) hue-rotate(180deg) brightness(.9) contrast(.9); } }
-:root[data-theme="dark"] .leaflet-tile-pane { filter: invert(1) hue-rotate(180deg) brightness(.9) contrast(.9); }
-.legend { background: var(--card); color: var(--text-primary); padding: 6px 10px; border-radius: 8px; font-size: 12px;
-  box-shadow: 0 1px 4px rgb(0 0 0 / .3); line-height: 1.7; }
-.legend i { display: inline-block; width: 12px; height: 12px; border-radius: 50%; border: 3px solid; margin-right: 6px; vertical-align: -2px; }
-@media (max-width: 760px) {
-  .layout { grid-template-columns: 1fr; grid-template-rows: 50vh auto; }
-  aside { border-left: 0; border-top: 1px solid var(--border); overflow: visible; }
-  body { display: block; }
+.row { all: unset; box-sizing: border-box; width: 100%; display: grid; grid-template-columns: 18px minmax(0,1fr) auto; gap: 1px 10px; align-items: center;
+  padding: 9px 20px; cursor: pointer; border-bottom: 1px solid var(--line); }
+.row:hover, .row:focus-visible { background: rgba(57,255,136,.05); }
+.row:focus-visible { outline: 2px solid var(--neon); outline-offset: -2px; }
+.row .t { font-size: 13.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.row .s { grid-column: 2 / 4; font: 11.5px var(--mono); color: var(--faint); }
+.tag { font: 700 10.5px var(--mono); letter-spacing: .08em; text-transform: uppercase; padding: 2px 7px; border-radius: 4px; border: 1px solid; white-space: nowrap; }
+.tag.Red { color: var(--red); border-color: rgba(255,90,82,.5); } .tag.Orange { color: var(--orange); border-color: rgba(255,165,58,.5); }
+.tag.Green { color: var(--green); border-color: rgba(111,211,138,.45); }
+.c-Red { color: var(--red); } .c-Orange { color: var(--orange); } .c-Green { color: var(--green); }
+#inspect[hidden] { display: none; }
+#inspect h2 { display: flex; gap: 8px; align-items: center; font: 700 17px/1.3 var(--mono); margin: 8px 0 2px; }
+#inspect h3 { font: 500 11px var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--neon); margin: 16px 0 6px; }
+#inspect p { margin: 0 0 6px; color: var(--soft); }
+#inspect .meta { font: 12px var(--mono); color: var(--faint); }
+#inspect .list { margin: 0 -20px; }
+.close { float: right; }
+.kv { display: grid; grid-template-columns: auto 1fr; gap: 3px 14px; font: 12.5px var(--mono); margin: 8px 0 0; }
+.kv dt { color: var(--muted); } .kv dd { margin: 0; color: var(--ink); text-align: right; }
+.big { font: 800 30px/1.1 var(--mono); color: var(--ink); }
+#inspect .plain { color: var(--ink); }
+.week { width: 100%; border-collapse: collapse; font: 12px var(--mono); }
+.week td, .week th { padding: 4px 2px; text-align: right; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.week th { color: var(--muted); font-weight: 500; } .week td:first-child, .week th:first-child { text-align: left; color: var(--soft); }
+.week td:nth-child(2), .week th:nth-child(2) { text-align: left; white-space: normal; color: var(--soft); }
+.rainbar { display: inline-block; height: 6px; border-radius: 3px; background: #4aa3ff; vertical-align: middle; margin-left: 4px; }
+svg.spark { width: 100%; height: 56px; display: block; }
+.notes { margin: 8px 0 0; padding-left: 18px; color: var(--ink); }
+.notes li { margin-bottom: 3px; }
+.foot { padding: 14px 20px 22px; font-size: 12px; color: var(--faint); }
+details.help summary { cursor: pointer; font: 500 12px var(--mono); color: var(--muted); }
+details.help summary::before { content: "$ "; color: var(--neon); }
+details.help dt { color: var(--ink); margin-top: 10px; font-weight: 600; } details.help dd { margin: 0; color: var(--muted); }
+.loading { color: var(--faint); font: 12px var(--mono); }
+.loading::after { content: "_"; animation: blink 1s infinite; }
+
+/* markers on the globe */
+.mk { display: grid; place-items: center; border-radius: 50%; border: 2px solid; background: rgba(7,6,6,.78); cursor: pointer;
+  transform: translate(-50%, -50%); pointer-events: auto; transition: transform .15s; }
+.mk:hover, .mk.sel { transform: translate(-50%, -50%) scale(1.35); }
+.mk.sel { box-shadow: 0 0 0 3px var(--neon); }
+.mk svg { width: 60%; height: 60%; }
+.mk.Red { border-color: var(--red); color: var(--red); } .mk.Orange { border-color: var(--orange); color: var(--orange); }
+.mk.Green { border-color: var(--green); color: var(--green); }
+
+@media (max-width: 860px) {
+  body { overflow: auto; }
+  .stage { position: relative; inset: auto; height: 58vh; }
+  aside { position: static; width: auto; border-left: 0; border-top: 1px solid var(--line); backdrop-filter: none; }
+  .hud.tr, .hud.br { display: none; }
 }
+@media (prefers-reduced-motion: reduce) { .live::before, .loading::after { animation: none; } }
 </style>
 </head>
 <body>
-<header>
-  <h1>🌍 World Disaster Watch</h1>
-  <span class="meta" id="meta">Loading…</span>
-</header>
-<div class="layout">
-  <div id="map" role="region" aria-label="World map of active disasters"></div>
-  <aside>
-    <section class="detail" id="detail" hidden aria-live="polite"></section>
-    <div class="filters" id="filters" role="group" aria-label="Filter events"></div>
-    <ul class="list" id="list"></ul>
-    <details class="help">
-      <summary>What do these words mean?</summary>
-      <dl>
-        <dt>Alert level (Green / Orange / Red)</dt>
-        <dd>Set by GDACS, a UN and European Commission system. It estimates how many people are exposed and how able the country is to cope. Red means international help will probably be needed.</dd>
-        <dt>Magnitude</dt>
-        <dd>How much energy an earthquake released. Each step up (6 to 7) is about 32 times more energy. Damage also depends on depth and how close towns are.</dd>
-        <dt>Hurricane, typhoon, cyclone</dt>
-        <dd>The same kind of storm with different names by ocean. Categories 1–5 rate the wind; Category 3 and above are "major".</dd>
-        <dt>Storm surge</dt>
-        <dd>Sea water pushed onto land by a storm's winds. It causes most hurricane deaths.</dd>
-        <dt>Forecast wind zones</dt>
-        <dd>The shaded areas around a cyclone show where winds of at least 60, 90 or 120 km/h are expected along its forecast path.</dd>
-      </dl>
-    </details>
-    <p class="disclaimer">Not an official warning service. Always follow your local authorities. Data: <a href="https://www.gdacs.org">GDACS</a>,
-      <a href="https://earthquake.usgs.gov">USGS</a>, weather by <a href="https://open-meteo.com">Open-Meteo</a>. Map © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors.
-      · <a href="https://github.com/GOPIVARDHAN1965/world-disaster-watch">Source</a></p>
-  </aside>
+<div class="stage">
+  <div id="globe" role="img" aria-label="3D globe of active disasters. Use the event list and place search in the side panel for keyboard access."></div>
+  <span class="corner tl"></span><span class="corner tr"></span><span class="corner bl"></span><span class="corner br"></span>
+  <div class="hud tl"><span class="live">Live · GDACS + USGS</span><br><span id="hud-count">loading…</span></div>
+  <div class="hud tr" id="hud-coord">--.--° · ---.--°</div>
+  <div class="hud bl legend"><span style="margin:0"><i style="border-color:var(--red)"></i>Red</span><span><i style="border-color:var(--orange)"></i>Orange</span><span><i style="border-color:var(--green)"></i>Green alert</span></div>
+  <div class="hud br" id="hud-updated"></div>
 </div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<aside>
+  <div class="brand">
+    <div class="path">~/world-disaster-<em>watch</em></div>
+    <p>Every active disaster on Earth, explained in plain words. Click any point on the globe to see its weather, forecast and air.</p>
+  </div>
+
+  <section class="block" id="inspect" hidden aria-live="polite"></section>
+
+  <div class="block">
+    <div class="cmd">inspect --place</div>
+    <form class="search" id="search">
+      <input id="q" type="search" placeholder="city, e.g. Tampa or Manila" aria-label="Search a place to inspect" autocomplete="off">
+      <button class="btn" type="submit">go</button>
+    </form>
+  </div>
+
+  <div class="block">
+    <div class="cmd">ls ~/events --sort=alert</div>
+    <div class="chips" id="chips" role="group" aria-label="Filter events by type"></div>
+  </div>
+  <ul class="list" id="list"></ul>
+
+  <div class="block">
+    <details class="help">
+      <summary>man disaster-words</summary>
+      <dl>
+        <dt>Alert level</dt><dd>Set by GDACS (UN + European Commission) from how many people are exposed and how well the country can cope. Red = international help likely needed.</dd>
+        <dt>Magnitude</dt><dd>Energy released by an earthquake. Each step up (6 → 7) is about 32× more energy. Shallow quakes shake the surface harder.</dd>
+        <dt>Hurricane / typhoon / cyclone</dt><dd>Same storm, different ocean. Categories 1–5 rate the wind; 3+ is "major".</dd>
+        <dt>Storm surge</dt><dd>Sea water pushed onto land by the wind. The deadliest part of most hurricanes.</dd>
+        <dt>Wind zones</dt><dd>The shaded bands around a cyclone's path show where winds of 60, 90 and 120 km/h are forecast.</dd>
+        <dt>Air quality (US AQI)</dt><dd>0–50 good · 51–100 moderate · 101–150 unhealthy for sensitive groups · 151+ unhealthy for everyone.</dd>
+      </dl>
+    </details>
+  </div>
+  <p class="foot">Not an official warning service: always follow local authorities. Data: <a href="https://www.gdacs.org">GDACS</a>, <a href="https://earthquake.usgs.gov">USGS</a>,
+    <a href="https://open-meteo.com">Open-Meteo</a>, places © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>. Globe imagery NASA.
+    · <a href="https://github.com/GOPIVARDHAN1965/world-disaster-watch">source</a></p>
+</aside>
+
+<script src="https://cdn.jsdelivr.net/npm/globe.gl@2.46.2/dist/globe.gl.min.js"></script>
 <script>
-const TYPES = {
-  TC: { label: 'Cyclones', one: 'Tropical cyclone', glyph: '🌀' },
-  EQ: { label: 'Earthquakes', one: 'Earthquake', glyph: '💥' },
-  FL: { label: 'Floods', one: 'Flood', glyph: '🌊' },
-  WF: { label: 'Wildfires', one: 'Wildfire', glyph: '🔥' },
-  VO: { label: 'Volcanoes', one: 'Volcano', glyph: '🌋' },
-  DR: { label: 'Droughts', one: 'Drought', glyph: '🏜️' },
+// ---------- icons (static line icons in currentColor; never built from data) ----------
+const P = 'fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"';
+const ICON = {
+  TC: `<svg viewBox="0 0 24 24" ${P}><circle cx="12" cy="12" r="2"/><path d="M4 9c2-4 8-6 12-3"/><path d="M20 15c-2 4-8 6-12 3"/><path d="M15 4c4 2 6 8 3 12"/><path d="M9 20c-4-2-6-8-3-12"/></svg>`,
+  EQ: `<svg viewBox="0 0 24 24" ${P}><path d="M2 12h4l2-6 3 12 3-9 2 5 2-2h4"/></svg>`,
+  FL: `<svg viewBox="0 0 24 24" ${P}><path d="M2 9c2 0 2-2 4-2s2 2 4 2 2-2 4-2 2 2 4 2 2-2 4-2"/><path d="M2 14c2 0 2-2 4-2s2 2 4 2 2-2 4-2 2 2 4 2 2-2 4-2"/><path d="M2 19c2 0 2-2 4-2s2 2 4 2 2-2 4-2 2 2 4 2 2-2 4-2"/></svg>`,
+  WF: `<svg viewBox="0 0 24 24" ${P}><path d="M12 22c4 0 7-3 7-7 0-4-3-6-4-10-2 2-3 4-3 6-1-1-2-2-2-4-2 2-5 5-5 8 0 4 3 7 7 7z"/></svg>`,
+  VO: `<svg viewBox="0 0 24 24" ${P}><path d="M3 20h18l-6-10h-6z"/><path d="M10 7c0-2 2-2 2-4M14 7c0-2 2-2 2-4M12 10V8"/></svg>`,
+  DR: `<svg viewBox="0 0 24 24" ${P}><circle cx="12" cy="9" r="4"/><path d="M12 1v2M4 9H2M22 9h-2M5.6 2.6l1.4 1.4M18.4 2.6L17 4"/><path d="M3 20l4-3 3 2 4-4 3 3 4-2"/></svg>`,
 };
+const TYPES = { TC: 'Cyclones', EQ: 'Earthquakes', FL: 'Floods', WF: 'Wildfires', VO: 'Volcanoes', DR: 'Droughts' };
+const ONE = { TC: 'Tropical cyclone', EQ: 'Earthquake', FL: 'Flood', WF: 'Wildfire', VO: 'Volcano', DR: 'Drought' };
 const RANK = { Red: 3, Orange: 2, Green: 1 };
+const RING = { Red: '255,90,82', Orange: '255,165,58' };
+
 const $ = id => document.getElementById(id);
 const el = (tag, props = {}, ...kids) => { const e = Object.assign(document.createElement(tag), props); e.append(...kids); return e; };
-const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const svg = t => { const s = document.createElement('span'); s.innerHTML = ICON[t]; return s.firstChild; };
+const ago = iso => { const s = (Date.now() - new Date(iso)) / 1000;
+  return s < 3600 ? Math.max(1, Math.round(s / 60)) + 'm ago' : s < 86400 ? Math.round(s / 3600) + 'h ago' : Math.round(s / 86400) + 'd ago'; };
+const fmtCoord = (lat, lng) => `${Math.abs(lat).toFixed(2)}°${lat >= 0 ? 'N' : 'S'} · ${Math.abs(lng).toFixed(2)}°${lng >= 0 ? 'E' : 'W'}`;
+const km = (a, b, c, d) => { const r = Math.PI / 180, x = Math.sin((c - a) * r / 2) ** 2 + Math.cos(a * r) * Math.cos(c * r) * Math.sin((d - b) * r / 2) ** 2; return 12742 * Math.asin(Math.sqrt(x)); };
 
-function ago(iso) {
-  const s = (Date.now() - new Date(iso)) / 1000;
-  if (s < 3600) return Math.max(1, Math.round(s / 60)) + ' min ago';
-  if (s < 86400) return Math.round(s / 3600) + ' h ago';
-  return Math.round(s / 86400) + ' days ago';
-}
+// ---------- globe ----------
+const IMG = 'https://cdn.jsdelivr.net/npm/three-globe@2.45.3/example/img/';
+const globe = new Globe($('globe'))
+  .globeImageUrl(IMG + 'earth-night.jpg')
+  .bumpImageUrl(IMG + 'earth-topology.png')
+  .backgroundColor('#070606')
+  .atmosphereColor('#39ff88').atmosphereAltitude(0.12)
+  .showGraticules(true);
+const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+globe.controls().autoRotate = !reduceMotion;
+globe.controls().autoRotateSpeed = 0.35;
+const sizeGlobe = () => { const r = $('globe').getBoundingClientRect(); globe.width(r.width).height(r.height); };
+new ResizeObserver(sizeGlobe).observe($('globe'));  // fits the stage on load, resize and mobile reflow
+globe.pointOfView({ lat: 18, lng: -40, altitude: 2.3 });
+['pointerdown', 'wheel'].forEach(ev => $('globe').addEventListener(ev, () => { globe.controls().autoRotate = false; }, { passive: true }));
 
-// ---- map
-const map = L.map('map', { worldCopyJump: true, zoomControl: true }).setView([15, 10], 2);
-L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-  maxZoom: 12,
-  attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-}).addTo(map);
-const legend = L.control({ position: 'bottomleft' });
-legend.onAdd = () => {
-  const d = L.DomUtil.create('div', 'legend');
-  d.innerHTML = `<div><i style="border-color:${css('--red')}"></i>Red alert</div><div><i style="border-color:${css('--orange')}"></i>Orange alert</div><div><i style="border-color:${css('--green')}"></i>Green alert</div>`;
+let events = [], selectedId = null, pointMarker = [], booting = true;
+const filter = { types: new Set(Object.keys(TYPES)), serious: false };
+const visible = e => filter.types.has(e.type) && (!filter.serious || e.alert !== 'Green');
+
+function marker(e) {
+  const size = { Red: 30, Orange: 24, Green: e.type === 'EQ' ? 12 : 18 }[e.alert];
+  const d = el('div', { className: `mk ${e.alert}${e.id === selectedId ? ' sel' : ''}`, title: `${e.alert} alert: ${e.name}` });
+  d.style.width = d.style.height = size + 'px';
+  if (size > 12) d.append(svg(e.type));
+  d.addEventListener('click', ev => { ev.stopPropagation(); selectEvent(e.id); });
   return d;
-};
-legend.addTo(map);
-
-const markers = new Map();
-const cycloneLayer = L.layerGroup().addTo(map);
-let events = [], selected = null;
-const filter = { types: new Set(Object.keys(TYPES)), seriousOnly: false };
-
-function icon(e) {
-  const size = 22 + RANK[e.alert] * 6;
-  return L.divIcon({ className: '', iconSize: [size, size],
-    html: `<div class="dw-marker ${e.alert}${selected === e.id ? ' selected' : ''}" style="width:${size}px;height:${size}px">${TYPES[e.type].glyph}</div>` });
 }
-
-const visible = e => filter.types.has(e.type) && (!filter.seriousOnly || e.alert !== 'Green');
 
 function render() {
   const shown = events.filter(visible);
-  for (const e of events) {
-    const m = markers.get(e.id);
-    if (visible(e)) { m.setIcon(icon(e)); m.addTo(map); } else m.remove();
-  }
-  filter.types.has('TC') ? cycloneLayer.addTo(map) : cycloneLayer.remove();
-  $('list').replaceChildren(...(shown.length ? shown.map(listItem) : [el('li', { className: 'empty', textContent: 'No events match these filters.' })]));
+  globe.htmlElementsData([...shown].sort((a, b) => RANK[a.alert] - RANK[b.alert])).htmlLat('lat').htmlLng('lon').htmlElement(marker).htmlAltitude(0.005);
+  globe.ringsData(shown.filter(e => e.alert !== 'Green').map(e => ({ lat: e.lat, lng: e.lon, rgb: RING[e.alert], r: e.alert === 'Red' ? 6 : 4, period: 1600 }))
+      .concat(pointMarker.map(p => ({ ...p, rgb: '57,255,136', r: 3, period: 900 }))))
+    .ringColor(d => t => `rgba(${d.rgb},${1 - t})`).ringMaxRadius('r').ringPropagationSpeed(2).ringRepeatPeriod('period');
+  $('list').replaceChildren(...(shown.length ? shown.map(row) : [el('li', { className: 'foot', textContent: 'No events match these filters.' })]));
 }
 
-function listItem(e) {
-  const b = el('button', { type: 'button' },
-    el('span', { className: 'glyph', textContent: TYPES[e.type].glyph, ariaHidden: 'true' }),
-    el('span', { className: 'title', textContent: e.name }),
-    el('span', { className: `pill ${e.alert}`, textContent: e.alert }),
-    el('span', { className: 'sub', textContent: `${TYPES[e.type].one} · ${(e.countries || []).slice(0, 2).join(', ')} · ${ago(e.start)}` }));
-  b.addEventListener('click', () => select(e.id, true));
+function row(e) {
+  const b = el('button', { className: 'row', type: 'button' }, el('span', { className: 'c-' + e.alert }, svg(e.type)),
+    el('span', { className: 't', textContent: e.name }), el('span', { className: `tag ${e.alert}`, textContent: e.alert }),
+    el('span', { className: 's', textContent: `${ONE[e.type].toLowerCase()} · ${(e.countries || []).slice(0, 2).join(', ') || '—'} · ${ago(e.start)}` }));
+  b.addEventListener('click', () => selectEvent(e.id));
   return el('li', {}, b);
 }
 
-function filters() {
-  const counts = {};
-  for (const e of events) counts[e.type] = (counts[e.type] || 0) + 1;
-  const chips = Object.entries(TYPES).map(([t, info]) => {
-    const cb = el('input', { type: 'checkbox', checked: true });
-    cb.addEventListener('change', () => { cb.checked ? filter.types.add(t) : filter.types.delete(t); render(); });
-    return el('label', { className: 'chip' }, cb, `${info.glyph} ${info.label} `, el('span', { className: 'n', textContent: counts[t] || 0 }));
-  });
-  const serious = el('input', { type: 'checkbox' });
-  serious.addEventListener('change', () => { filter.seriousOnly = serious.checked; render(); });
-  $('filters').replaceChildren(...chips, el('label', { className: 'chip' }, serious, 'Orange & Red only'));
+function chips() {
+  const n = {}; for (const e of events) n[e.type] = (n[e.type] || 0) + 1;
+  const mk = (label, checked, onChange, icon, count) => {
+    const cb = el('input', { type: 'checkbox', checked }); cb.addEventListener('change', () => onChange(cb.checked));
+    return el('label', { className: 'chip' }, cb, ...(icon ? [svg(icon)] : []), label, ...(count != null ? [el('span', { className: 'n', textContent: count })] : []));
+  };
+  $('chips').replaceChildren(
+    ...Object.entries(TYPES).map(([t, label]) => mk(label, true, on => { on ? filter.types.add(t) : filter.types.delete(t); render(); }, t, n[t] || 0)),
+    mk('orange + red only', false, on => { filter.serious = on; render(); }));
 }
 
-// ---- detail card
-function section(title, text) { return text ? [el('h3', { textContent: title }), el('p', { textContent: text })] : []; }
+// ---------- inspect panel ----------
+function openInspect(kids) {
+  const close = el('button', { className: 'btn close', type: 'button', textContent: 'esc', ariaLabel: 'Close details' });
+  close.addEventListener('click', closeInspect);
+  $('inspect').replaceChildren(close, ...kids);
+  $('inspect').hidden = false;
+  if (!booting) $('inspect').scrollIntoView({ block: 'nearest' });  // a shared link shouldn't scroll past the globe on phones
+}
+function closeInspect() { $('inspect').hidden = true; selectedId = null; pointMarker = []; inspectPoint.current = null; history.replaceState(null, '', location.pathname); render(); }
+addEventListener('keydown', e => { if (e.key === 'Escape' && !$('inspect').hidden) closeInspect(); });
 
-function select(id, fly) {
-  const e = events.find(x => x.id === id);
-  if (!e) return;
-  const prev = selected; selected = id;
-  for (const pid of [prev, id]) { const ev = events.find(x => x.id === pid); if (ev && markers.has(pid)) markers.get(pid).setIcon(icon(ev)); }
-  history.replaceState(null, '', '#' + id);
-  if (fly) map.flyTo([e.lat, e.lon], Math.max(map.getZoom(), e.type === 'DR' ? 4 : 5), { duration: 0.8 });
-
-  const x = e.explain;
-  const close = el('button', { className: 'close', type: 'button', textContent: '✕ Close', ariaLabel: 'Close details' });
-  close.addEventListener('click', () => { $('detail').hidden = true; selected = null; history.replaceState(null, '', location.pathname); render(); });
-  const kids = [
-    close,
-    el('span', { className: `pill ${e.alert}`, textContent: `${e.alert} alert` }),
-    el('h2', { textContent: `${TYPES[e.type].glyph} ${e.name}` }),
-    el('div', { className: 'when', textContent: `${TYPES[e.type].one} · started ${ago(e.start)} · updated ${ago(e.updated)}` }),
-    ...section('What happened', x.what),
-    ...section('How bad is it', x.severity),
-    ...section('Who noticed', x.impact),
-    ...section('What to expect', x.expect),
-    ...section('What the alert means', x.alert),
-  ];
-  const wx = el('div', {}, el('p', { className: 'when', textContent: 'Loading forecast…' }));
-  kids.push(el('h3', { textContent: 'Weather here, next 7 days' }), wx,
-    el('p', { className: 'when' }, 'Official source: ', el('a', { href: e.report_url, target: '_blank', rel: 'noopener', textContent: e.source === 'USGS' ? 'USGS event page' : 'GDACS report' })));
-  $('detail').replaceChildren(...kids);
-  $('detail').hidden = false;
-  $('detail').scrollIntoView({ block: 'nearest' });
-  weather(e, wx);
+function selectEvent(id) {
+  const e = events.find(x => x.id === id); if (!e) return;
+  selectedId = id; pointMarker = []; inspectPoint.current = null; history.replaceState(null, '', '#' + id);
+  globe.controls().autoRotate = false;
+  globe.pointOfView({ lat: e.lat, lng: e.lon, altitude: e.type === 'DR' ? 1.4 : 1.0 }, 1200);
+  render();
+  const x = e.explain, wx = el('div', {}, el('div', { className: 'loading', textContent: 'fetching forecast' }));
+  const sec = (h, t) => t ? [el('h3', { textContent: h }), el('p', { textContent: t })] : [];
+  openInspect([
+    el('div', { className: 'cmd', textContent: `inspect ${e.id}` }),
+    el('span', { className: `tag ${e.alert}`, textContent: `${e.alert} alert` }),
+    el('h2', {}, el('span', { className: 'c-' + e.alert }, svg(e.type)), e.name),
+    el('div', { className: 'meta', textContent: `${ONE[e.type]} · started ${ago(e.start)} · updated ${ago(e.updated)} · ${fmtCoord(e.lat, e.lon)}` }),
+    ...sec('what happened', x.what), ...sec('how bad', x.severity), ...sec('who noticed', x.impact),
+    ...sec('what to expect', x.expect), ...sec('what the alert means', x.alert),
+    el('h3', { textContent: 'weather at this spot' }), wx,
+    el('p', { className: 'meta' }, 'official source: ', el('a', { href: e.report_url, target: '_blank', rel: 'noopener', textContent: e.source === 'USGS' ? 'USGS event page' : 'GDACS report' })),
+  ]);
+  weather(e.lat, e.lon, wx, () => selectedId === id, false);
 }
 
-async function weather(e, box) {
-  const url = `https://api.open-meteo.com/v1/forecast?latitude=${e.lat}&longitude=${e.lon}&timezone=auto&forecast_days=7` +
-    '&current=temperature_2m,wind_speed_10m,precipitation&daily=temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_max';
+function inspectPoint(lat, lng, label) {
+  selectedId = null; pointMarker = [{ lat, lng }];
+  history.replaceState(null, '', `#@${lat.toFixed(3)},${lng.toFixed(3)}`);
+  globe.controls().autoRotate = false;
+  render();
+  const token = `${lat},${lng},${Date.now()}`; inspectPoint.current = token;
+  const still = () => inspectPoint.current === token;
+  const place = el('h2', { textContent: label || 'locating…' });
+  const near = events.map(e => ({ e, d: km(lat, lng, e.lat, e.lon) })).filter(x => x.d <= 1000).sort((a, b) => RANK[b.e.alert] - RANK[a.e.alert] || a.d - b.d);
+  const nearBox = near.length
+    ? el('ul', { className: 'list' }, ...near.slice(0, 6).map(({ e, d }) => { const li = row(e); li.querySelector('.s').textContent = `${Math.round(d).toLocaleString()} km away · ${ONE[e.type].toLowerCase()}`; return li; }))
+    : el('p', { className: 'plain', textContent: 'No active disasters within 1,000 km.' });
+  const wx = el('div', {}, el('div', { className: 'loading', textContent: 'fetching forecast' }));
+  const air = el('div', {}, el('div', { className: 'loading', textContent: 'fetching air quality' }));
+  openInspect([el('div', { className: 'cmd', textContent: `inspect --point ${lat.toFixed(2)},${lng.toFixed(2)}` }), place,
+    el('div', { className: 'meta', textContent: fmtCoord(lat, lng) }),
+    el('h3', { textContent: 'weather' }), wx, el('h3', { textContent: 'air' }), air,
+    el('h3', { textContent: `active disasters within 1,000 km (${near.length})` }), nearBox]);
+  if (!label) reverse(lat, lng).then(name => { if (still()) place.textContent = name; });
+  weather(lat, lng, wx, still, true);
+  airQuality(lat, lng, air, still);
+}
+
+async function reverse(lat, lng) {
+  try {
+    const r = await (await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=10&accept-language=en&lat=${lat}&lon=${lng}`)).json();
+    if (r.error || !r.address) return 'Open water';
+    const a = r.address;
+    return [a.city || a.town || a.village || a.county || a.state_district || a.state, a.country].filter(Boolean).join(', ') || r.display_name;
+  } catch { return 'Unknown place'; }
+}
+
+const WMO = { 0: 'clear sky', 1: 'mostly clear', 2: 'partly cloudy', 3: 'overcast', 45: 'fog', 48: 'freezing fog', 51: 'light drizzle', 53: 'drizzle', 55: 'heavy drizzle',
+  56: 'freezing drizzle', 57: 'freezing drizzle', 61: 'light rain', 63: 'rain', 65: 'heavy rain', 66: 'freezing rain', 67: 'freezing rain', 71: 'light snow', 73: 'snow',
+  75: 'heavy snow', 77: 'snow grains', 80: 'showers', 81: 'showers', 82: 'violent showers', 85: 'snow showers', 86: 'heavy snow showers',
+  95: 'thunderstorm', 96: 'thunderstorm, hail', 99: 'severe storm, hail' };
+const F = c => Math.round(c * 9 / 5 + 32);
+
+async function weather(lat, lng, box, still, withHourly) {
+  const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&timezone=auto&forecast_days=7` +
+    '&current=temperature_2m,apparent_temperature,relative_humidity_2m,weather_code,wind_speed_10m,wind_gusts_10m' +
+    '&hourly=temperature_2m&forecast_hours=24' +
+    '&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_max,uv_index_max';
   try {
     const w = await (await fetch(url)).json();
-    if (selected !== e.id) return;  // user moved on while loading
-    const d = w.daily, f = c => Math.round(c * 9 / 5 + 32);
-    const rows = d.time.map((t, i) => el('tr', {},
-      el('td', { textContent: new Date(t + 'T12:00').toLocaleDateString(undefined, { weekday: 'short', day: 'numeric' }) }),
-      el('td', { textContent: `${Math.round(d.temperature_2m_max[i])}° / ${Math.round(d.temperature_2m_min[i])}°C` }),
-      el('td', { textContent: `${Math.round(d.precipitation_sum[i])} mm` }),
-      el('td', { textContent: `${Math.round(d.wind_speed_10m_max[i])} km/h` })));
+    if (!still()) return;
+    const c = w.current, d = w.daily;
     const notes = [];
     d.time.forEach((t, i) => {
       const day = new Date(t + 'T12:00').toLocaleDateString(undefined, { weekday: 'long' });
-      if (d.precipitation_sum[i] >= 50) notes.push(`${day}: very heavy rain (${Math.round(d.precipitation_sum[i])} mm). Flooding is possible.`);
+      if (d.precipitation_sum[i] >= 50) notes.push(`${day}: very heavy rain (${Math.round(d.precipitation_sum[i])} mm), flooding possible.`);
       else if (d.precipitation_sum[i] >= 20) notes.push(`${day}: heavy rain (${Math.round(d.precipitation_sum[i])} mm).`);
-      if (d.wind_speed_10m_max[i] >= 62) notes.push(`${day}: gale-force winds (${Math.round(d.wind_speed_10m_max[i])} km/h). Loose objects can blow around.`);
-      if (d.temperature_2m_max[i] >= 40) notes.push(`${day}: dangerous heat (${Math.round(d.temperature_2m_max[i])}°C / ${f(d.temperature_2m_max[i])}°F).`);
+      if (d.wind_speed_10m_max[i] >= 62) notes.push(`${day}: gale-force wind (${Math.round(d.wind_speed_10m_max[i])} km/h), loose objects can fly.`);
+      if (d.temperature_2m_max[i] >= 40) notes.push(`${day}: dangerous heat (${Math.round(d.temperature_2m_max[i])}°C / ${F(d.temperature_2m_max[i])}°F).`);
+      if (d.uv_index_max[i] >= 11) notes.push(`${day}: extreme UV (${Math.round(d.uv_index_max[i])}), sunburn in minutes.`);
     });
-    const c = w.current;
-    box.replaceChildren(
-      el('p', { textContent: `Right now: ${Math.round(c.temperature_2m)}°C (${f(c.temperature_2m)}°F), wind ${Math.round(c.wind_speed_10m)} km/h${c.precipitation > 0 ? `, raining (${c.precipitation} mm in the last hour)` : ''}.` }),
-      el('table', { className: 'wx' }, el('thead', {}, el('tr', {}, ...['Day', 'High / low', 'Rain', 'Max wind'].map(h => el('th', { textContent: h })))), el('tbody', {}, ...rows)),
-      notes.length ? el('ul', { className: 'wxnote' }, ...notes.map(n => el('li', { textContent: n })))
-                   : el('p', { className: 'wxnote', textContent: 'No heavy rain, strong wind or extreme heat in the forecast.' }));
-  } catch {
-    box.replaceChildren(el('p', { className: 'when', textContent: 'Weather forecast unavailable right now.' }));
-  }
+    const sky = (WMO[c.weather_code] || 'weather').replace(/^./, s => s.toUpperCase());
+    const kids = [
+      el('div', { className: 'big', textContent: `${Math.round(c.temperature_2m)}°C · ${F(c.temperature_2m)}°F` }),
+      el('p', { className: 'plain', textContent: `${sky}, feels like ${Math.round(c.apparent_temperature)}°C. Wind ${Math.round(c.wind_speed_10m)} km/h, gusting ${Math.round(c.wind_gusts_10m)}. Humidity ${c.relative_humidity_2m}%.` }),
+      el('dl', { className: 'kv' }, el('dt', { textContent: 'elevation' }), el('dd', { textContent: `${Math.round(w.elevation)} m` }),
+        el('dt', { textContent: 'local time' }), el('dd', { textContent: new Date().toLocaleTimeString('en-US', { timeZone: w.timezone, hour: 'numeric', minute: '2-digit' }) + ' ' + (w.timezone_abbreviation || '') })),
+    ];
+    if (withHourly && w.hourly) kids.push(el('h3', { textContent: 'next 24 h · temp °C' }), spark(w.hourly.temperature_2m, w.hourly.time));
+    const maxRain = Math.max(1, ...d.precipitation_sum);
+    kids.push(el('h3', { textContent: '7-day forecast' }), el('table', { className: 'week' },
+      el('thead', {}, el('tr', {}, ...['day', 'sky', 'hi / lo °C', 'rain'].map(h => el('th', { textContent: h })))),
+      el('tbody', {}, ...d.time.map((t, i) => {
+        const bar = el('span', { className: 'rainbar' }); bar.style.width = Math.max(1, 36 * d.precipitation_sum[i] / maxRain) + 'px';
+        return el('tr', {},
+          el('td', { textContent: new Date(t + 'T12:00').toLocaleDateString(undefined, { weekday: 'short', day: 'numeric' }) }),
+          el('td', { textContent: WMO[d.weather_code[i]] || '—' }),
+          el('td', { textContent: `${Math.round(d.temperature_2m_max[i])} / ${Math.round(d.temperature_2m_min[i])}` }),
+          el('td', {}, `${Math.round(d.precipitation_sum[i])} mm`, bar));
+      }))));
+    kids.push(notes.length ? el('ul', { className: 'notes' }, ...notes.map(n => el('li', { textContent: n })))
+                           : el('p', { className: 'meta', textContent: 'No heavy rain, strong wind, extreme heat or UV in the next 7 days.' }));
+    box.replaceChildren(...kids);
+  } catch { if (still()) box.replaceChildren(el('p', { className: 'meta', textContent: 'Forecast unavailable right now.' })); }
 }
 
-// ---- load
+function spark(vals, times) {
+  const W = 360, H = 56, lo = Math.min(...vals) - 1, hi = Math.max(...vals) + 1;
+  const x = i => 4 + i * (W - 8) / (vals.length - 1), y = v => H - 14 - (v - lo) / (hi - lo) * (H - 22);
+  const ns = 'http://www.w3.org/2000/svg', s = document.createElementNS(ns, 'svg');
+  s.setAttribute('viewBox', `0 0 ${W} ${H}`); s.setAttribute('class', 'spark'); s.setAttribute('role', 'img');
+  s.setAttribute('aria-label', `Temperature next 24 hours: ${Math.round(Math.min(...vals))} to ${Math.round(Math.max(...vals))} °C`);
+  const line = document.createElementNS(ns, 'polyline');
+  line.setAttribute('points', vals.map((v, i) => `${x(i)},${y(v)}`).join(' '));
+  for (const [k, v] of Object.entries({ fill: 'none', stroke: '#39ff88', 'stroke-width': 2, 'stroke-linejoin': 'round' })) line.setAttribute(k, v);
+  s.append(line);
+  for (const i of [0, Math.floor(vals.length / 2), vals.length - 1]) {
+    const t = document.createElementNS(ns, 'text');
+    for (const [k, v] of Object.entries({ x: x(i), y: H - 2, 'text-anchor': i === 0 ? 'start' : i === vals.length - 1 ? 'end' : 'middle',
+      fill: '#9a9284', 'font-size': 10, 'font-family': 'JetBrains Mono, monospace' })) t.setAttribute(k, v);
+    t.textContent = `${times[i].slice(11, 16)} ${Math.round(vals[i])}°`;
+    s.append(t);
+  }
+  return s;
+}
+
+async function airQuality(lat, lng, box, still) {
+  try {
+    const a = (await (await fetch(`https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lat}&longitude=${lng}&current=us_aqi,pm2_5,uv_index`)).json()).current;
+    if (!still()) return;
+    if (!a || a.us_aqi == null) { box.replaceChildren(el('p', { className: 'meta', textContent: 'No air-quality data here (often open ocean).' })); return; }
+    const q = a.us_aqi, label = q <= 50 ? 'Good: fine for everyone.' : q <= 100 ? 'Moderate: OK for most; very sensitive people may notice.' :
+      q <= 150 ? 'Unhealthy for sensitive groups: kids, older adults and people with asthma should limit time outside.' :
+      q <= 200 ? 'Unhealthy: everyone should cut back on outdoor exercise.' : 'Very unhealthy or worse: stay indoors if you can.';
+    box.replaceChildren(el('p', { className: 'plain', textContent: `AQI ${Math.round(q)}. ${label}` }),
+      el('dl', { className: 'kv' }, el('dt', { textContent: 'PM2.5' }), el('dd', { textContent: `${a.pm2_5} µg/m³` }),
+        el('dt', { textContent: 'UV index now' }), el('dd', { textContent: a.uv_index == null ? '—' : a.uv_index.toFixed(1) })));
+  } catch { if (still()) box.replaceChildren(el('p', { className: 'meta', textContent: 'Air quality unavailable right now.' })); }
+}
+
+// place search: keyboard-friendly path to the same point inspector
+$('search').addEventListener('submit', async ev => {
+  ev.preventDefault();
+  const q = $('q').value.trim(); if (!q) return;
+  try {
+    const r = (await (await fetch(`https://geocoding-api.open-meteo.com/v1/search?count=1&language=en&name=${encodeURIComponent(q)}`)).json()).results?.[0];
+    if (!r) { openInspect([el('p', { className: 'plain', textContent: `No place found for "${q}".` })]); return; }
+    globe.pointOfView({ lat: r.latitude, lng: r.longitude, altitude: 1.0 }, 1200);
+    inspectPoint(r.latitude, r.longitude, [r.name, r.admin1, r.country].filter(Boolean).join(', '));
+  } catch { openInspect([el('p', { className: 'plain', textContent: 'Place search is unavailable right now.' })]); }
+});
+
+globe.onGlobeClick(({ lat, lng }) => inspectPoint(lat, lng));
+let hoverRaf = 0;
+$('globe').addEventListener('pointermove', ev => {
+  if (hoverRaf) return;
+  hoverRaf = requestAnimationFrame(() => {
+    hoverRaf = 0;
+    const r = $('globe').getBoundingClientRect(), c = globe.toGlobeCoords(ev.clientX - r.left, ev.clientY - r.top);
+    $('hud-coord').textContent = c ? fmtCoord(c.lat, c.lng) : '--.--° · ---.--°';
+  });
+});
+
+// ---------- data ----------
 Promise.all([fetch('data/events.json').then(r => r.json()), fetch('data/cyclones.geojson').then(r => r.json())]).then(([d, cyc]) => {
   events = d.events;
   const n = a => events.filter(e => e.alert === a).length;
-  $('meta').textContent = `${events.length} active events · ${n('Red')} red, ${n('Orange')} orange · updated ${ago(d.generated_at)}`;
-  const zoneColor = { Poly_Green: css('--green'), Poly_Orange: css('--orange'), Poly_Red: css('--red') };
-  L.geoJSON(cyc, {
-    style: f => f.properties.kind.startsWith('Line_')
-      ? { color: css('--text-secondary'), weight: 1.5, dashArray: '4 4', fill: false }
-      : { color: zoneColor[f.properties.kind], weight: 1, fillColor: zoneColor[f.properties.kind], fillOpacity: 0.15 },
-    interactive: false,
-  }).addTo(cycloneLayer);
-  // draw low alerts first so red sits on top
-  for (const e of [...events].sort((a, b) => RANK[a.alert] - RANK[b.alert])) {
-    const m = L.marker([e.lat, e.lon], { icon: icon(e), title: `${e.alert} alert: ${e.name}`, alt: `${e.alert} alert: ${e.name}`, riseOnHover: true,
-      zIndexOffset: RANK[e.alert] * 1000 });
-    m.on('click', () => select(e.id, false));
-    m.on('keypress', ev => { if (ev.originalEvent.key === 'Enter') select(e.id, false); });
-    markers.set(e.id, m);
-  }
-  filters();
-  render();
-  const hash = decodeURIComponent(location.hash.slice(1));
-  if (hash) select(hash, true);
-}).catch(() => { $('meta').textContent = 'Could not load event data. Try again in a minute.'; });
+  $('hud-count').replaceChildren(el('b', { textContent: events.length }), ' active · ', el('b', { className: 'c-Red', textContent: n('Red') }), ' red · ',
+    el('b', { className: 'c-Orange', textContent: n('Orange') }), ' orange');
+  $('hud-updated').textContent = 'updated ' + ago(d.generated_at);
+
+  // cyclone wind zones (polygons) + tracks (paths)
+  const zone = { Poly_Cones: '239,233,221', Poly_Green: '111,211,138', Poly_Orange: '255,165,58', Poly_Red: '255,90,82' };
+  const alt = { Poly_Cones: 0.001, Poly_Green: 0.002, Poly_Orange: 0.003, Poly_Red: 0.004 };
+  globe.polygonsData(cyc.features.filter(f => zone[f.properties.kind]))
+    .polygonCapColor(f => `rgba(${zone[f.properties.kind]},${f.properties.kind === 'Poly_Cones' ? 0.05 : 0.2})`).polygonSideColor(() => 'rgba(0,0,0,0)')
+    .polygonStrokeColor(f => `rgba(${zone[f.properties.kind]},0.7)`).polygonAltitude(f => alt[f.properties.kind])
+    .onPolygonClick((p, ev, { lat, lng }) => inspectPoint(lat, lng));
+  globe.pathsData(cyc.features.filter(f => f.geometry.type === 'LineString').map(f => f.geometry.coordinates.map(([lng, lat]) => [lat, lng])))
+    .pathColor(() => 'rgba(239,233,221,0.75)').pathDashLength(0.02).pathDashGap(0.01).pathStroke(1).pathPointAlt(0.006);
+
+  chips(); render();
+  const h = decodeURIComponent(location.hash.slice(1));
+  if (h.startsWith('@')) { const [la, lo] = h.slice(1).split(',').map(Number); if (isFinite(la) && isFinite(lo)) { globe.pointOfView({ lat: la, lng: lo, altitude: 1.0 }); inspectPoint(la, lo); } }
+  else if (h) selectEvent(h);
+  booting = false;
+}).catch(() => { $('hud-count').textContent = 'could not load event data'; });
 </script>
 </body>
 </html>

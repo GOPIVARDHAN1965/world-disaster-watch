@@ -40,6 +40,22 @@ def get(url):
             time.sleep(5)
 
 
+def clockwise(geom):
+    """GDACS rings are counter-clockwise; the globe (d3 spherical convention) reads that as
+    'everything except this area', so flip exterior rings to clockwise and holes to counter-clockwise."""
+    def area(ring):
+        return sum(x1 * y2 - x2 * y1 for (x1, y1), (x2, y2) in zip(ring, ring[1:]))
+
+    def fix(rings):
+        return [r[::-1] if (area(r) > 0) == (i == 0) else r for i, r in enumerate(rings)]
+
+    if geom["type"] == "Polygon":
+        return {**geom, "coordinates": fix(geom["coordinates"])}
+    if geom["type"] == "MultiPolygon":
+        return {**geom, "coordinates": [fix(p) for p in geom["coordinates"]]}
+    return geom
+
+
 def gdacs_events():
     """Centroid feature per event, plus cyclone track/wind-zone features."""
     events, cyclone_shapes = {}, []
@@ -51,7 +67,7 @@ def gdacs_events():
             if f["geometry"]["type"] == "Point" and p.get("Class") in (None, "Point_Centroid"):
                 events[(t, p["eventid"])] = f
             elif t == "TC" and (p.get("Class", "").startswith("Poly_") or p.get("Class", "").startswith("Line_")):
-                cyclone_shapes.append({"type": "Feature", "geometry": f["geometry"], "properties": {
+                cyclone_shapes.append({"type": "Feature", "geometry": clockwise(f["geometry"]), "properties": {
                     "eventid": p["eventid"], "kind": p["Class"], "label": p.get("polygonlabel")}})
     return events, cyclone_shapes
 
