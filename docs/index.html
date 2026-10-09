@@ -92,6 +92,9 @@ details.help dd { margin: 0; color: var(--text-secondary); }
 .dw-marker.Green { border-color: var(--green); }
 .dw-marker.selected { outline: 3px solid var(--accent); outline-offset: 2px; }
 .leaflet-container { font: inherit; }
+/* OSM has no dark tiles: invert + rotate hue so water stays blue-ish */
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .leaflet-tile-pane { filter: invert(1) hue-rotate(180deg) brightness(.9) contrast(.9); } }
+:root[data-theme="dark"] .leaflet-tile-pane { filter: invert(1) hue-rotate(180deg) brightness(.9) contrast(.9); }
 .legend { background: var(--card); color: var(--text-primary); padding: 6px 10px; border-radius: 8px; font-size: 12px;
   box-shadow: 0 1px 4px rgb(0 0 0 / .3); line-height: 1.7; }
 .legend i { display: inline-block; width: 12px; height: 12px; border-radius: 50%; border: 3px solid; margin-right: 6px; vertical-align: -2px; }
@@ -129,7 +132,7 @@ details.help dd { margin: 0; color: var(--text-secondary); }
       </dl>
     </details>
     <p class="disclaimer">Not an official warning service. Always follow your local authorities. Data: <a href="https://www.gdacs.org">GDACS</a>,
-      <a href="https://earthquake.usgs.gov">USGS</a>, weather by <a href="https://open-meteo.com">Open-Meteo</a>. Map © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, © <a href="https://carto.com/attributions">CARTO</a>.
+      <a href="https://earthquake.usgs.gov">USGS</a>, weather by <a href="https://open-meteo.com">Open-Meteo</a>. Map © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors.
       · <a href="https://github.com/GOPIVARDHAN1965/world-disaster-watch">Source</a></p>
   </aside>
 </div>
@@ -158,10 +161,9 @@ function ago(iso) {
 
 // ---- map
 const map = L.map('map', { worldCopyJump: true, zoomControl: true }).setView([15, 10], 2);
-const dark = matchMedia('(prefers-color-scheme: dark)').matches && document.documentElement.dataset.theme !== 'light';
-L.tileLayer(`https://{s}.basemaps.cartocdn.com/${dark ? 'dark_all' : 'light_all'}/{z}/{x}/{y}{r}.png`, {
-  maxZoom: 12, subdomains: 'abcd',
-  attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> © <a href="https://carto.com/attributions">CARTO</a>',
+L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  maxZoom: 12,
+  attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
 }).addTo(map);
 const legend = L.control({ position: 'bottomleft' });
 legend.onAdd = () => {
