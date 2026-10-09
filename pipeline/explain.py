@@ -151,9 +151,13 @@ def ask_model(fact_dict, token):
     body = json.dumps({"model": MODEL, "temperature": 0.2, "max_tokens": 160,
                        "messages": [{"role": "user", "content": PROMPT.format(facts=json.dumps(fact_dict, indent=1))}]}).encode()
     req = urllib.request.Request("https://models.github.ai/inference/chat/completions", data=body, headers={
-        "Authorization": f"Bearer {token}", "Content-Type": "application/json"})
+        "Authorization": f"Bearer {token}", "Content-Type": "application/json", "Accept": "application/json"})
     with urllib.request.urlopen(req, timeout=60) as r:
-        return json.load(r)["choices"][0]["message"]["content"].strip()
+        raw = r.read().decode("utf-8", "replace")
+    try:
+        return json.loads(raw)["choices"][0]["message"]["content"].strip()
+    except (ValueError, KeyError, IndexError):
+        raise ValueError(f"unexpected model response (HTTP {r.status}, {r.headers.get('content-type')}): {raw[:200]!r}")
 
 
 def wants_ai(e):
