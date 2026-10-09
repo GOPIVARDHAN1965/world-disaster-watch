@@ -66,8 +66,6 @@ aside { border-left: 1px solid var(--border); overflow-y: auto; display: flex; f
 .detail h3 { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--text-muted); margin: 14px 0 4px; }
 .detail p { margin: 0 0 6px; }
 .detail .when { color: var(--text-muted); font-size: 13px; }
-.ai { border-left: 3px solid var(--accent); padding: 6px 10px; background: var(--hover); border-radius: 0 8px 8px 0; }
-.ai small { display: block; color: var(--text-muted); font-size: 12px; margin-top: 4px; }
 .close { float: right; all: unset; cursor: pointer; color: var(--text-muted); font-size: 13px; padding: 2px 6px; border-radius: 6px; }
 .close:hover, .close:focus-visible { background: var(--hover); color: var(--text-primary); }
 .close:focus-visible { outline: 2px solid var(--accent); }
@@ -244,8 +242,6 @@ function select(id, fly) {
     ...section('What to expect', x.expect),
     ...section('What the alert means', x.alert),
   ];
-  if (e.ai) kids.push(el('h3', { textContent: 'In plain words' }),
-    el('div', { className: 'ai' }, e.ai, el('small', { textContent: 'Written by AI from the facts above. Checked automatically: any number not in the official data is rejected.' })));
   const wx = el('div', {}, el('p', { className: 'when', textContent: 'Loading forecast…' }));
   kids.push(el('h3', { textContent: 'Weather here, next 7 days' }), wx,
     el('p', { className: 'when' }, 'Official source: ', el('a', { href: e.report_url, target: '_blank', rel: 'noopener', textContent: e.source === 'USGS' ? 'USGS event page' : 'GDACS report' })));

@@ -20,6 +20,7 @@ import explain  # noqa: E402
 
 ROOT = Path(__file__).parent.parent
 OUT = ROOT / "docs" / "data"
+HISTORY = ROOT / "data" / "history.csv"
 GDACS = "https://www.gdacs.org/gdacsapi/api/events/geteventlist/MAP?eventtype={}"
 USGS = "https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/4.5_week.geojson"
 GDACS_TYPES = ["TC", "FL", "VO", "DR", "WF", "EQ"]
@@ -114,7 +115,6 @@ def main():
 
     for e in events:
         e["explain"] = explain.template(e)
-    explain.add_ai(events)
 
     events.sort(key=lambda e: e["start"], reverse=True)          # newest first...
     events.sort(key=lambda e: ALERT_RANK[e["alert"]], reverse=True)  # ...within each alert level (stable sort)
@@ -126,6 +126,18 @@ def main():
     for e in events:
         counts[e["type"]] = counts.get(e["type"], 0) + 1
     print(f"{len(events)} events {counts}, {len(cyclone_shapes)} cyclone shapes")
+
+    # one row per day: a running record of world disaster activity (first run of the day wins)
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    cols = ["date", "events", "red", "orange", "green"] + GDACS_TYPES
+    if not HISTORY.exists():
+        HISTORY.parent.mkdir(exist_ok=True)
+        HISTORY.write_text(",".join(cols) + "\n")
+    if today not in {line.split(",")[0] for line in HISTORY.read_text().splitlines()}:
+        alerts = {a: sum(e["alert"] == a for e in events) for a in ("Red", "Orange", "Green")}
+        row = [today, len(events), alerts["Red"], alerts["Orange"], alerts["Green"]] + [counts.get(t, 0) for t in GDACS_TYPES]
+        with HISTORY.open("a") as f:
+            f.write(",".join(map(str, row)) + "\n")
 
 
 if __name__ == "__main__":

@@ -12,8 +12,9 @@ forecast for the affected spot.
 
 ```
 GDACS (UN / European Commission) ─┐                        ┌─ docs/data/events.json
-USGS earthquakes (M4.5+, 7 days) ──┼─► pipeline/fetch.py ──┤
-GitHub Models (free tier) ─────────┘   + explain.py        └─ docs/data/cyclones.geojson
+                                   ├─► pipeline/fetch.py ──┤
+USGS earthquakes (M4.5+, 7 days) ──┘   + explain.py        ├─ docs/data/cyclones.geojson
+                                                           └─ data/history.csv (one row per day)
                                                                      │
                        docs/index.html (Leaflet map) ◄───────────────┘
                                  ▲
@@ -24,15 +25,13 @@ GitHub Models (free tier) ─────────┘   + explain.py        �
   7 days of USGS earthquakes, then redeploys the static site. USGS quakes are joined to GDACS
   impact alerts by event ID. If every feed comes back nearly empty, the run fails instead of
   publishing an empty map.
-- **Plain-language explanations, two layers.**
-  1. *Templates* turn the official numbers into sentences: magnitude into "Strong: it can
-     seriously damage buildings…", wind speed into a hurricane category and what those winds
-     do, burned hectares into acres and soccer fields, and alert levels into what they mean.
-  2. *AI paragraph* (Orange/Red alerts, all cyclones, quakes M6+). GitHub Models writes 2–3
-     sentences from the same facts only. A **number guard** rejects any paragraph containing a
-     number that isn't in the official data (rounding allowed), so it can't invent death tolls
-     or convert units wrongly. Accepted paragraphs are cached per event and regenerated only
-     when the facts change, to stay inside the free tier.
+- **Plain-language explanations.** `pipeline/explain.py` turns the official numbers into
+  sentences, so nothing is made up: magnitude and depth into "Strong: it can seriously damage
+  buildings…", wind speed into a hurricane category and what those winds do, burned hectares
+  into acres and soccer fields, drought area into square miles, and alert levels into what
+  they mean.
+- **Daily history.** The first run each day appends counts by alert level and hazard type to
+  `data/history.csv`, building a running record of world disaster activity.
 - **Forecasts come from official sources:** GDACS/NOAA cyclone wind zones (60/90/120 km/h)
   and tracks, and the Open-Meteo weather forecast at the event location, with plain notes for
   heavy rain, gale-force wind and dangerous heat. The app does not make its own disaster
@@ -44,7 +43,7 @@ Standard library only, Python 3.10+:
 
 ```bash
 python pipeline/test_explain.py
-GITHUB_TOKEN=... python pipeline/fetch.py   # token optional: without it, templates only
+python pipeline/fetch.py
 python -m http.server -d docs               # http://localhost:8000
 ```
 

@@ -7,7 +7,6 @@ permissions:
   contents: write
   pages: write
   id-token: write
-  models: read   # GitHub Models (free tier) for the AI paragraphs
 concurrency: refresh
 
 jobs:
@@ -21,14 +20,12 @@ jobs:
           python-version: "3.12"
       - run: python pipeline/test_explain.py
       - run: python pipeline/fetch.py
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-      - name: commit AI cache (only when new paragraphs were written)
+      - name: commit daily history row (once a day; also keeps the schedule from being paused)
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/ai_cache.json
-          git diff --cached --quiet || (git commit -m "ai cache: $(date -u +%FT%H:%M)" && git push)
+          git add data/history.csv
+          git diff --cached --quiet || (git commit -m "history: $(date -u +%F)" && git push)
       - uses: actions/upload-pages-artifact@v3
         with:
           path: docs
