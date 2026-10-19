@@ -60,7 +60,13 @@ def gdacs_events():
     """Centroid feature per event, plus cyclone track/wind-zone features."""
     events, cyclone_shapes = {}, []
     for t in GDACS_TYPES:
-        for f in get(GDACS.format(t))["features"]:
+        try:
+            features = get(GDACS.format(t))["features"]
+        except urllib.error.HTTPError as e:
+            if e.code != 404:
+                raise
+            features = []  # GDACS answers 404 when a type has no current events
+        for f in features:
             p = f["properties"]
             if p.get("iscurrent") != "true":
                 continue
